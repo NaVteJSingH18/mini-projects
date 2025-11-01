@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ultimate Tic Tac Toe</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: radial-gradient(circle at top, #141e30, #243b55);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding-top: 20px;
+    }
+
+    h1 {
+      text-shadow: 0 0 20px #00ffff;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    select, button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background: #00bcd4;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 1rem;
+    }
+
+    .board {
+      display: grid;
+      gap: 6px;
+      margin-top: 15px;
+      justify-content: center;
+      align-content: center;
+      max-width: 40vw;
+    }
+
+    .cell {
+      background: rgba(255,255,255,0.15);
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      aspect-ratio: 1 / 1;
+      color: #00e5ff;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.1s;
+      user-select: none;
+    }
+
+    .cell:hover {
+      background: rgba(255,255,255,0.25);
+      transform: scale(1.05);
+    }
+
+    .winner {
+      margin-top: 15px;
+      text-shadow: 0 0 10px #00ff88;
+      font-size: 1.1em;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.3rem; }
+      select, button { font-size: 0.9rem; padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>✨ Ultimate Tic Tac Toe ✨</h1>
+
+  <div class="controls">
+    <label for="mode">Mode:</label>
+    <select id="mode">
+      <option value="1">Single Player (vs AI)</option>
+      <option value="2">2 Players (3×3)</option>
+      <option value="3">3 Players (4×4)</option>
+      <option value="4">4 Players (6×6)</option>
+    </select>
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <div class="board" id="board"></div>
+  <div class="winner" id="winner"></div>
+  <button id="resetBtn" style="display:none;">Restart</button>
+
+  <script>
+    const board = document.getElementById("board");
+    const winnerText = document.getElementById("winner");
+    const resetBtn = document.getElementById("resetBtn");
+    const startBtn = document.getElementById("startBtn");
+    const modeSelect = document.getElementById("mode");
+
+    const symbols = ["❌", "⭕", "🟡", "🟢"];
+    let mode, players, gameState, currentPlayer, gameActive, boardSize;
+
+    startBtn.addEventListener("click", startGame);
+    resetBtn.addEventListener("click", startGame);
+
+    function startGame() {
+      board.innerHTML = "";
+      winnerText.textContent = "";
+      resetBtn.style.display = "none";
+      mode = parseInt(modeSelect.value, 10);
+      players = symbols.slice(0, mode);
+      currentPlayer = 0;
+      gameActive = true;
+
+      // Set board size dynamically
+      if (mode === 1 || mode === 2) boardSize = 3;
+      else if (mode === 3) boardSize = 4;
+      else boardSize = 6;
+
+      gameState = Array(boardSize * boardSize).fill("");
+
+      // Adjust cell size dynamically
+      const cellSize = Math.min(80 / boardSize, 20); // vw unit for responsive sizing
+      board.style.gridTemplateColumns = `repeat(${boardSize}, minmax(30px, ${cellSize}vw))`;
+
+      for (let i = 0; i < boardSize * boardSize; i++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.index = i;
+        cell.style.fontSize = `${Math.max(1.2, 4.5 - boardSize * 0.5)}vw`; // ensure readable
+        cell.addEventListener("click", handleClick);
+        board.appendChild(cell);
+      }
+    }
+
+    function handleClick(e) {
+      const index = Number(e.target.dataset.index);
+      if (!gameActive || gameState[index] !== "") return;
+
+      gameState[index] = players[currentPlayer];
+      e.target.textContent = players[currentPlayer];
+
+      if (checkWinner()) {
+        winnerText.textContent = `🎉 Player ${currentPlayer + 1} (${players[currentPlayer]}) Wins!`;
+        gameActive = false;
+        resetBtn.style.display = "block";
+        return;
+      }
+
+      if (gameState.every(c => c !== "")) {
+        winnerText.textContent = "🤝 Draw!";
+        gameActive = false;
+        resetBtn.style.display = "block";
+        return;
+      }
+
+      // If single-player, let AI move after human (player 0) move
+      if (mode === 1 && currentPlayer === 0) {
+        currentPlayer = 1;
+        aiMove();
+        return;
+      }
+
+      currentPlayer = (currentPlayer + 1) % mode;
+    }
+
+    // Simple AI — tries to win or block using players[] symbols
+    function aiMove() {
+      if (!gameActive) return;
+      const empty = gameState.map((v, i) => v === "" ? i : null).filter(v => v !== null);
+      if (empty.length === 0) return;
+
+      const aiSymbol = players[1] || symbols[1];
+      const humanSymbol = players[0] || symbols[0];
+
+      // Try to win
+      for (let i of empty) {
+        gameState[i] = aiSymbol;
+        if (checkWinner()) {
+          return finalizeAIMove(i, aiSymbol);
+        }
+        gameState[i] = "";
+      }
+
+      // Try to block human
+      for (let i of empty) {
+        gameState[i] = humanSymbol;
+        if (checkWinner()) {
+          gameState[i] = aiSymbol;
+          return finalizeAIMove(i, aiSymbol);
+        }
+        gameState[i] = "";
+      }
+
+      // Else random
+      const move = empty[Math.floor(Math.random() * empty.length)];
+      finalizeAIMove(move, aiSymbol);
+    }
+
+    function finalizeAIMove(index, symbol) {
+      if (index == null || !gameActive) return;
+      setTimeout(() => {
+        gameState[index] = symbol;
+        if (board.children[index]) board.children[index].textContent = symbol;
+
+        if (checkWinner()) {
+          winnerText.textContent = "🤖 AI Wins!";
+          gameActive = false;
+          resetBtn.style.display = "block";
+          return;
+        }
+
+        if (gameState.every(c => c !== "")) {
+          winnerText.textContent = "🤝 Draw!";
+          gameActive = false;
+          resetBtn.style.display = "block";
+          return;
+        }
+
+        currentPlayer = 0;
+      }, 400);
+    }
+
+    // Check winner dynamically (any board size)
+    function checkWinner() {
+      const lines = [];
+
+      // Rows
+      for (let r = 0; r < boardSize; r++) {
+        lines.push([...Array(boardSize).keys()].map(i => r * boardSize + i));
+      }
+      // Columns
+      for (let c = 0; c < boardSize; c++) {
+        lines.push([...Array(boardSize).keys()].map(i => i * boardSize + c));
+      }
+      // Diagonals
+      lines.push([...Array(boardSize).keys()].map(i => i * (boardSize + 1)));
+      lines.push([...Array(boardSize).keys()].map(i => (i + 1) * (boardSize - 1)));
+
+      return lines.some(line => {
+        const values = line.map(i => gameState[i]);
+        return values[0] && values.every(v => v === values[0]);
+      });
+    }
+  </script>
+</body>
+</html>
